@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tienda de Abarrotes Bolivia</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
+</head>
+<em>
+  <body class="bg-dark text-white">
+  <div class="container py-4">
+    <h1 class="text-center mb-4">🛒 Tienda de Abarrotes Bolivia</h1>
+
+    <!-- Categorías -->
+    <div class="mb-4 d-flex flex-wrap gap-2">
+      <button class="btn btn-outline-warning" onclick="mostrarCategoria('Golosinas')">Golosinas</button>
+      <button class="btn btn-outline-info" onclick="mostrarCategoria('Gaseosas')">Gaseosas</button>
+      <button class="btn btn-outline-primary" onclick="mostrarCategoria('Abarrotes')">Abarrotes</button>
+      <button class="btn btn-outline-success" onclick="mostrarCategoria('Limpieza')">Limpieza</button>
+      <button class="btn btn-outline-danger" onclick="mostrarCategoria('Friales')">Friales</button>
+      <button class="btn btn-outline-info ms-auto" onclick="verHistorial()">Ver Historial</button>
+    </div>
+
+    <!-- Productos -->
+    <div id="productosContainer" class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-4">
+      <!-- Los productos se agregarán aquí dinámicamente -->
+    </div>
+
+    <!-- Carrito -->
+    <h3 class="mt-5">🛍 Carrito</h3>
+    <table class="table table-bordered border-dark" id="carritoTabla">
+      <thead class="table table-bordered border-dark">
+        <tr>
+          <th class="bg-secondary">Producto</th>
+          <th class="bg-secondary">Cantidad</th>
+          <th class="bg-secondary">Precio</th>
+          <th class="bg-secondary">Total</th>
+          <th class="bg-secondary">Acción</th>
+          
+      </thead>
+      <tbody id="carritoLista"></tbody>
+    </table>
+
+    <!-- Datos del cliente -->
+    <div class="mb-3 row">
+      <div class="col-md-6">
+        <input type="text" id="nombreCliente" class="form-control mb-2" placeholder="Nombre del cliente" />
+      </div>
+      <div class="col-md-6">
+        <input type="text" id="direccionCliente" class="form-control mb-2" placeholder="Dirección del cliente" />
+      </div>
+    </div>
+    <button class="btn btn-success mb-4" onclick="finalizarCompra()">Finalizar Compra</button>
+
+    <!-- Historial -->
+    <div class="mt-5 d-none" id="historialSection">
+      <h3>📦 Historial de Ventas</h3>
+      <table class="table table-bordered border-dark">
+        <thead class="table-secondary border-dark">
+          <tr>
+            <th class="bg-secondary">Cliente</th>
+            <th class="bg-secondary">Dirección</th>
+            <th class="bg-secondary">Total</th>
+            <th class="bg-secondary">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="historialTabla"></tbody>
+      </table>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="detalleModal" tabindex="-1">
+      <div class="modal-dialog text-dark">
+        <div class="modal-content text-dark">
+          <div class="modal-header text-dark">
+            <h5 class="modal-title text-dark ">📋 Detalle de Venta</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="detalleVenta"></div>
+        </div>
+      </div>
+    </div>
+  </div>  
+ <!-- Modal de compra exitosa -->
+<div class="modal fade" id="modalCompraExitosa" tabindex="-1" aria-labelledby="modalCompraExitosaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center">
+      <div class="modal-header">
+        <h5 class="modal-title w-100 bg-dark id="modalCompraExitosaLabel">¡Éxito!</h5>
+      </div>
+      <div class="modal-body">
+        <p class=" text-dark">Se ha agregado la compra exitosamente.</p>
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalConfirmarEliminar" tabindex="-1" aria-labelledby="modalConfirmarEliminarLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-dark" id="modalConfirmarEliminarLabel">¿Estás seguro de eliminar esta venta?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Botones para aceptar o cancelar la eliminación -->
+        <button type="button" class="btn btn-danger" id="btnAceptarEliminar">Aceptar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    let db;
+    let carrito = [];
+
+    window.onload = () => {
+      const request = indexedDB.open("TiendaDB", 1);
+
+      request.onupgradeneeded = e => {
+        db = e.target.result;
+        const productosStore = db.createObjectStore("productos", { keyPath: "id", autoIncrement: true });
+        productosStore.createIndex("categoria", "categoria", { unique: false });
+        db.createObjectStore("clientes", { keyPath: "id", autoIncrement: true });
+        db.createObjectStore("ventas", { keyPath: "id", autoIncrement: true });
+        cargarDatosIniciales(productosStore);
+      };
+      request.onsuccess = e => {
+        db = e.target.result;
+      };
+    };
+
+    function cargarDatosIniciales(store) {
+      const productos = [
+        // Golosinas
+        { nombre: "Dino", precio: 1, categoria: "Golosinas", imagen:"https://www.distribuidorapop.com.ar/wp-content/uploads/2022/04/Yummy-DINO-POP-online.jpg"},
+        { nombre: "Tico Tico", precio: 1, categoria: "Golosinas", imagen:"https://images.rappi.com.uy/products/7cb5cc9e-9aac-4195-9952-9fcddffde7ef.jpg?d=50x50&e=webp&q=10" },
+        { nombre: "Bon Bon", precio: 2, categoria: "Golosinas", imagen: "https://www.laberintogoloso.com/wp-content/uploads/2020/11/bon-o-bon-choco-leche-15gr.jpg" },
+        { nombre: "Arcor Frutilla", precio: 1, categoria: "Golosinas", imagen: "https://i.ebayimg.com/images/g/2TYAAOSwHQxcwK5t/s-l400.jpg" },
+        { nombre: "Choco Rollo", precio: 2, categoria: "Golosinas", imagen:"https://lagranbodega.vteximg.com.br/arquivos/ids/293955-1000-1000/75002275.jpg?v=638252292985300000" },
+        // Gaseosas
+        { nombre: "Coca Cola Bolivia", precio: 8, categoria: "Gaseosas", imagen:"https://paizhn.vtexassets.com/arquivos/ids/342925/Gaseosa-Coca-Cola-regular-2-L-1-4739.jpg?v=638392774231800000" },
+        { nombre: "Fanta Naranja", precio: 7, categoria: "Gaseosas", imagen: "https://discouy.vtexassets.com/arquivos/ids/1944231/Refresco-FANTA-naranja-2-L-Retornable-2.jpg?v=638791190832330000" },
+        { nombre: "Sprite", precio: 7, categoria: "Gaseosas", imagen: "https://mercaldas.vtexassets.com/arquivos/ids/1324681-800-auto?v=638484513993170000&width=800&height=auto&aspect=true" },
+        { nombre: "Pepsi", precio: 6, categoria: "Gaseosas", imagen: "https://plazavea.vteximg.com.br/arquivos/ids/30892713-512-512/20426701.jpg" },
+        { nombre: "Taquiña Soda", precio: 5, categoria: "Gaseosas", imagen: "https://www.agavemicromercado.com/wp-content/uploads/6CBN-TAQ-Cerv-1Lt.jpg" },
+
+        // Abarrotes
+        { nombre: "Arroz Grano de Oro", precio: 10, categoria: "Abarrotes", imagen: "https://icnorteb2c.vteximg.com.br/arquivos/ids/156050-1000-1000/Arroz-Grano-de-Oro-Caisy-1-Kg-1-422.jpg?v=637345691784600000" },
+        { nombre: "Fideo Don Vittorio", precio: 7, categoria: "Abarrotes", imagen: "https://plazavea.vteximg.com.br/arquivos/ids/17161217-512-512/780698.jpg" },
+        { nombre: "Azúcar Nacional", precio: 6, categoria: "Abarrotes", imagen: "https://unimarc.vtexassets.com/arquivos/ids/222017/000000000000653230-UN-01.jpg?v=637738722877230000" },
+        { nombre: "Harina Famosa", precio: 8, categoria: "Abarrotes", imagen: "https://hipermaxi.com/tienda-api/marketfile/ImageEcommerce?hashfile=b944f31_19d8_4935_97a0_0e87994a7c47.jpg&co=5&size=400x400" },
+        { nombre: "Sal Yungueña", precio: 3, categoria: "Abarrotes", imagen: "https://carrefourar.vtexassets.com/arquivos/ids/542355/7791720031766_01.jpg?v=638568432656500000" },
+
+        // Limpieza
+        { nombre: "Fabuloso Lavanda", precio: 10, categoria: "Limpieza", imagen: "https://lagranbodega.vteximg.com.br/arquivos/ids/287454-1000-1000/7501035905344_00.jpg?v=637932352098230000" },
+        { nombre: "Cloro Veneno", precio: 5, categoria: "Limpieza", imagen: "https://chile.clorox.com/wp-content/uploads/sites/2/2019/05/Copia-de-220224_CBX_CH_CLX_Splashless_Original_950g.png" },
+        { nombre: "Jabón Bolívar", precio: 4, categoria: "Limpieza", imagen: "https://imagedelivery.net/4fYuQyy-r8_rpBpcY7lH_A/tottusPE/43339970_1/w=800,h=800,fit=pad" },
+        { nombre: "Desinfectante Pato", precio: 9, categoria: "Limpieza", imagen: "https://walmartsv.vtexassets.com/arquivos/ids/578443/50897_01.jpg?v=638659914410300000" },
+        { nombre: "Esponja Tricolor", precio: 2, categoria: "Limpieza", imagen: "https://http2.mlstatic.com/D_NQ_NP_747655-MLC54979360619_052023-O.webp" },
+
+        // Friales
+        { nombre: "Chorizo Chuquisaqueño", precio: 15, categoria: "Friales", imagen: "https://sofia.com.bo/wp-content/uploads/2021/06/CHORIZO-PARRILLERO-AL-VACIO-DE-5-UNIDADES.png" },
+        { nombre: "Salchicha Cochabambina", precio: 12, categoria: "Friales", imagen: "https://sofia.com.bo/wp-content/uploads/2021/06/salchicha_de_pavo_kostlich_skin.jpg" },
+        { nombre: "Jamón Cerdito", precio: 14, categoria: "Friales", imagen: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSgo5hKvIWfqh1WVjYJ-IXRXjNnqPupXYTcBw&s" },
+        { nombre: "Mortadela La Estancia", precio: 11, categoria: "Friales", imagen: "https://sofia.com.bo/wp-content/uploads/2021/06/P.U-MORTADELA-PRIMAVERA-VACIO-200-GRS.jpg" },
+        { nombre: "Tocino ahumado", precio: 16, categoria: "Friales", imagen: "https://sofia.com.bo/wp-content/uploads/2021/06/TOCINO-DE-CERDO-AHUMADO-AL-VACIO-150.jpg" }
+      ];
+      productos.forEach(p => store.add(p));
+    }
+
+    function mostrarCategoria(categoria) {
+      const tx = db.transaction("productos", "readonly");
+      const store = tx.objectStore("productos");
+      const index = store.index("categoria");
+      index.getAll(categoria).onsuccess = e => {
+        const productos = e.target.result;
+        const container = document.getElementById("productosContainer");
+        container.innerHTML = "";
+        productos.forEach(p => {
+          container.innerHTML += `
+            <div class="col">
+              <div class="card">
+                <img src="${p.imagen}" class="card-img-top" alt="${p.nombre}">
+                <div class="card-body">
+                  <h5 class="card-title">${p.nombre}</h5>
+                  <p class="card-text">Bs ${p.precio}</p>
+                  <button class="btn btn-dark btn-outline-info text-white" onclick='agregarAlCarrito(${JSON.stringify(p)})'>Agregar</button>
+                </div>
+              </div>
+            </div>`;
+        });
+      };
+    }
+
+    function agregarAlCarrito(producto) {
+      const existe = carrito.find(p => p.id === producto.id);
+      if (existe) {
+        existe.cantidad++;
+      } else {
+        producto.cantidad = 1;
+        carrito.push(producto);
+      }
+      renderizarCarrito();
+    }
+
+    function renderizarCarrito() {
+      const lista = document.getElementById("carritoLista");
+      lista.innerHTML = "";
+      carrito.forEach((item, i) => {
+        lista.innerHTML += `
+          <tr>
+            <td>${item.nombre}</td>
+            <td>
+              <input type="number" value="${item.cantidad}" min="1" class="form-control" style="width: 60px;" onchange="cambiarCantidad(${i}, this.value)">
+            </td>
+            <td>Bs ${item.precio}</td>
+            <td>Bs ${item.precio * item.cantidad}</td>
+            <td><button class="btn btn-sm btn-danger" onclick="quitarDelCarrito(${i})">X</button></td>
+          </tr>`;
+      });
+    }
+
+    function cambiarCantidad(index, valor) {
+      carrito[index].cantidad = parseInt(valor);
+      renderizarCarrito();
+    }
+
+    function quitarDelCarrito(index) {
+      carrito.splice(index, 1);
+      renderizarCarrito();
+    }
+
+    function finalizarCompra() {
+      const nombre = document.getElementById("nombreCliente").value;
+      const direccion = document.getElementById("direccionCliente").value;
+      if (!nombre || !direccion || carrito.length === 0) return alert("Complete los datos y agregue productos");
+
+      const total = carrito.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+      const venta = { nombre, direccion, carrito, total };
+
+      const txCliente = db.transaction("clientes", "readwrite");
+      txCliente.objectStore("clientes").add({ nombre, direccion });
+
+      const txVenta = db.transaction("ventas", "readwrite");
+      txVenta.objectStore("ventas").add(venta);
+
+      carrito = [];
+      renderizarCarrito();
+      document.getElementById("nombreCliente").value = "";
+      document.getElementById("direccionCliente").value = "";
+      const modalCompra = new bootstrap.Modal(document.getElementById('modalCompraExitosa'));
+      modalCompra.show();
+    }
+
+    function verHistorial() {
+      document.getElementById("historialSection").classList.remove("d-none");
+      const tabla = document.getElementById("historialTabla");
+      tabla.innerHTML = "";
+      const tx = db.transaction("ventas", "readonly");
+      tx.objectStore("ventas").getAll().onsuccess = e => {
+        e.target.result.forEach(venta => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${venta.nombre}</td>
+            <td>${venta.direccion}</td>
+            <td>Bs ${venta.total}</td>
+            <td>
+              <button class="btn  btn-info" onclick="verDetalles(${venta.id})">Detalles</button>
+              <button class="btn  btn-warning" onclick="editarVenta(${venta.id})">Editar</button>
+              <button class="btn btn-danger" onclick="confirmarEliminacion(${venta.id})">Eliminar</button>
+            </td>`;
+          tabla.appendChild(tr);
+        });
+      };
+    }
+
+    function editarVenta(id) {
+  const tx = db.transaction("ventas", "readonly");
+  tx.objectStore("ventas").get(id).onsuccess = e => {
+    const venta = e.target.result;
+
+    // Crear un formulario para editar la venta
+    const formulario = `
+      <h5 class="text-dark">Editar Venta</h5>
+      <div class="mb-3" >
+        <label for="editNombreCliente" class="form-label text-dark">Nombre del Cliente</label>
+        <input type="text" id="editNombreCliente" class="form-control" value="${venta.nombre}">
+      </div>
+      <div class="mb-3">
+        <label for="editDireccionCliente" class="form-label text-dark">Dirección del Cliente</label>
+        <input type="text" id="editDireccionCliente" class="form-control " value="${venta.direccion}">
+      </div>
+      <h5 class="text-dark">Productos</h5>
+      <ul class="text-dark"id="editProductos">
+        ${venta.carrito.map(producto => `
+          <li>
+            ${producto.nombre} x 
+            <input type="number" value="${producto.cantidad}" min="1" class="form-control" style="width: 60px;" onchange="actualizarProducto(${venta.id}, '${producto.nombre}', this.value)">
+          </li>
+        `).join('')}
+      </ul>
+      <button class="btn btn-dark btn-outline-warning text-white" onclick="guardarEdicion(${venta.id})">Guardar Cambios</button>`;
+    
+    // Mostrar el formulario en un modal
+    const modalBody = document.getElementById('detalleVenta');
+    modalBody.innerHTML = formulario;
+    const modal = new bootstrap.Modal(document.getElementById('detalleModal'));
+    modal.show();
+  };
+}
+
+function actualizarProducto(ventaId, productoNombre, cantidad) {
+  const tx = db.transaction("ventas", "readwrite");
+  const store = tx.objectStore("ventas");
+  
+  store.get(ventaId).onsuccess = e => {
+    const venta = e.target.result;
+    const producto = venta.carrito.find(p => p.nombre === productoNombre);
+    if (producto) {
+      producto.cantidad = parseInt(cantidad);
+      store.put(venta);
+      calcularTotal(venta);
+    }
+  };
+}
+
+function calcularTotal(venta) {
+  const total = venta.carrito.reduce((acc, producto) => acc + producto.precio * producto.cantidad, 0);
+  const tx = db.transaction("ventas", "readwrite");
+  const store = tx.objectStore("ventas");
+  
+  venta.total = total;
+  store.put(venta);
+}
+
+function guardarEdicion(ventaId) {
+  const nombre = document.getElementById("editNombreCliente").value;
+  const direccion = document.getElementById("editDireccionCliente").value;
+
+  if (!nombre || !direccion) {
+    alert("Debe completar todos los campos.");
+    return;
+  }
+
+  const tx = db.transaction("ventas", "readwrite");
+  const store = tx.objectStore("ventas");
+
+  store.get(ventaId).onsuccess = e => {
+    const venta = e.target.result;
+    venta.nombre = nombre;
+    venta.direccion = direccion;
+
+    store.put(venta);
+    alert("Venta actualizada exitosamente.");
+    verHistorial();
+    const modal = bootstrap.Modal.getInstance(document.getElementById('detalleModal'));
+    modal.hide();
+  };
+}
+let ventaAEliminarId = null; 
+function confirmarEliminacion(idVenta) {
+  ventaAEliminarId = idVenta;
+  const modal = new bootstrap.Modal(document.getElementById('modalConfirmarEliminar'));
+  modal.show();
+}
+document.getElementById('btnAceptarEliminar').addEventListener('click', function() { 
+  if (ventaAEliminarId !== null) {
+    eliminarVenta(ventaAEliminarId); 
+    ventaAEliminarId = null; 
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmarEliminar'));
+    modal.hide(); 
+    verHistorial(); 
+  }
+});
+function eliminarVenta(id) {
+  const tx = db.transaction("ventas", "readwrite");
+  tx.objectStore("ventas").delete(id); 
+}
+
+
+    function verDetalles(id) {
+      const tx = db.transaction("ventas", "readonly");
+      tx.objectStore("ventas").get(id).onsuccess = e => {
+        const venta = e.target.result;
+        const modal = new bootstrap.Modal(document.getElementById('detalleModal'));
+        let detalleHTML = `
+          <p><strong>Cliente:</strong> ${venta.nombre}</p>
+          <p><strong>Dirección:</strong> ${venta.direccion}</p>
+          <h5>Productos:</h5>
+          <ul>`;
+        venta.carrito.forEach(p => {
+          detalleHTML += `
+            <li>${p.nombre} x ${p.cantidad} - Bs ${p.precio * p.cantidad}</li>`;
+        });
+        detalleHTML += `</ul>
+          <p><strong>Total:</strong> Bs ${venta.total}</p>`;
+        document.getElementById("detalleVenta").innerHTML = detalleHTML;
+        modal.show();
+      };
+    }
+    
+  </script>
+</body>
+</em>
+</html>
+
+
+
+
+
+
+
+
